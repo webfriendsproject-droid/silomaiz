@@ -1,0 +1,1 @@
+SiloMaíz es una App de una sola descarga, diseñada para realizar cálculos de consumo de silo de maíz y superficie a sembrar por parte de los productores de ganado bovino doble propósito en zonas tropicales
