@@ -1,7 +1,8 @@
+{
   "name": "SiloMaíz",
   "short_name": "SiloMaíz",
-  "description": "Calculadora de ensilaje de maíz para ganaderos",
-  "start_url": "/",
+  "description": "Calculadora de ensilaje de maíz para ganaderos. Más silo, más leche, más becerros.",
+  "start_url": "/silomaiz/SiloMaiz_BETA_COMPARTIR.html",
   "display": "standalone",
   "background_color": "#0A0E12",
   "theme_color": "#085041",
