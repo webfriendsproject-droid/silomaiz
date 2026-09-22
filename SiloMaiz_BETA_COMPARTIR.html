@@ -174,6 +174,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .reg-field{margin-bottom:11px}.reg-field label{display:block;font-size:11px;font-weight:700;margin:0 0 5px;color:#fff}.reg-field input,.reg-field select{width:100%;height:46px;border-radius:10px;border:1px solid #3A424C;background:#fff;color:#222;padding:0 12px;font-size:14px;outline:none}.reg-field input:focus,.reg-field select:focus{border:2px solid #1D9E75}
 .reg-btn{width:100%;border:0;border-radius:12px;background:#1D9E75;color:#fff;padding:14px;font-size:16px;font-weight:800;cursor:pointer;margin-top:5px}.reg-btn:disabled{opacity:.6}.reg-privacy{font-size:10px;color:#AEB7C2;line-height:1.45;margin-top:12px;text-align:center}.reg-error{display:none;background:#2A1414;color:#E27272;border-radius:8px;padding:8px 10px;font-size:11px;margin-bottom:10px}.reg-foot{text-align:center;color:#8D98A5;font-size:10px;margin-top:13px}
 
+
+#smAccountBtn{position:fixed;right:14px;bottom:14px;z-index:9990;border:0;border-radius:999px;background:#085041;color:#fff;padding:10px 15px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;display:none}
+#smAccountPanel{position:fixed;inset:0;z-index:9995;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:18px}
+#smAccountPanel.activo{display:flex} #smAccountCard{width:min(430px,100%);background:#fff;border-radius:18px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+#smAccountCard h2{margin:0 0 8px;color:#085041} #smAccountEmail{font-size:13px;color:#555;word-break:break-word;margin-bottom:16px}
+.smAccAction{width:100%;padding:12px 14px;margin:6px 0;border-radius:10px;border:1px solid #d7dedb;background:#fff;font-weight:750;cursor:pointer}
+.smAccPrimary{background:#085041;color:#fff;border-color:#085041}.smAccDanger{color:#b42318;border-color:#f0b7b2;background:#fff7f6}
+.smAccLink{display:block;text-align:center;margin-top:10px;color:#085041;font-weight:700;text-decoration:underline}#smAccMsg{font-size:13px;margin-top:10px;display:none}
 </style>
 </head>
 <body>
@@ -475,6 +483,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 </div>
 
 </div>
+
+<button id="smAccountBtn" type="button">Mi cuenta</button>
+<div id="smAccountPanel" role="dialog" aria-modal="true"><div id="smAccountCard">
+<h2>Mi cuenta</h2><div id="smAccountEmail"></div>
+<button class="smAccAction smAccPrimary" id="smCloseAccount" type="button">Volver a SiloMaíz</button>
+<button class="smAccAction" id="smLogout" type="button">Cerrar sesión</button>
+<button class="smAccAction smAccDanger" id="smDeleteAccount" type="button">Eliminar mi cuenta y mis datos</button>
+<a class="smAccLink" href="privacidad.html" target="_blank" rel="noopener">Política de privacidad y eliminación de cuenta</a>
+<div id="smAccMsg"></div></div></div>
+
 <script>
 
 /* === Registro / acceso SiloMaíz con Firebase === */
@@ -485,7 +503,7 @@ let silomaizFirebase = null;
 
 async function silomaizCargarFirebase(){
   if(silomaizFirebase) return silomaizFirebase;
-  const [{initializeApp},{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged},{getFirestore,doc,setDoc,serverTimestamp}] = await Promise.all([
+  const [{initializeApp},{getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut,deleteUser,reauthenticateWithCredential,EmailAuthProvider},{getFirestore,doc,setDoc,deleteDoc,serverTimestamp}] = await Promise.all([
     import("https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js"),
     import("https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js"),
     import("https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js")
@@ -502,7 +520,8 @@ async function silomaizCargarFirebase(){
   silomaizFirebase = {
     auth:getAuth(app), db:getFirestore(app),
     createUserWithEmailAndPassword, signInWithEmailAndPassword,
-    onAuthStateChanged, doc, setDoc, serverTimestamp
+    onAuthStateChanged, signOut, deleteUser, reauthenticateWithCredential, EmailAuthProvider,
+    doc, setDoc, deleteDoc, serverTimestamp
   };
   return silomaizFirebase;
 }
@@ -527,6 +546,9 @@ async function silomaizInitRegistro(){
     const fb=await silomaizCargarFirebase();
     fb.onAuthStateChanged(fb.auth,function(user){
       document.getElementById('registroInicial').classList.toggle('activo',!user);
+      const ab=document.getElementById('smAccountBtn'); if(ab) ab.style.display=user?'block':'none';
+      const ae=document.getElementById('smAccountEmail'); if(ae) ae.textContent=user?('Sesión: '+(user.email||'')):'';
+      if(!user) document.getElementById('smAccountPanel')?.classList.remove('activo');
     });
   }catch(ex){
     document.getElementById('registroInicial').classList.add('activo');
@@ -586,7 +608,39 @@ async function silomaizIngresar(){
     btn.disabled=false;btn.textContent='Ya tengo cuenta';
   }
 }
+
+async function silomaizCerrarSesion(){
+ const fb=await silomaizCargarFirebase(); await fb.signOut(fb.auth);
+ try{localStorage.removeItem(SILOMAIZ_REG_KEY);}catch(e){}
+ document.getElementById('smAccountPanel').classList.remove('activo');
+}
+async function silomaizEliminarCuenta(){
+ const fb=await silomaizCargarFirebase(),user=fb.auth.currentUser;if(!user)return;
+ if(!confirm('Esta acción eliminará permanentemente tu cuenta de SiloMaíz y los datos de tu perfil. ¿Deseas continuar?'))return;
+ const password=prompt('Por seguridad, escribe tu contraseña de SiloMaíz para confirmar la eliminación. La contraseña no se guarda.');if(password===null)return;
+ const msg=document.getElementById('smAccMsg');msg.style.display='block';msg.style.color='#555';msg.textContent='Eliminando cuenta...';
+ try{
+  const credential=fb.EmailAuthProvider.credential(user.email,password);
+  await fb.reauthenticateWithCredential(user,credential);
+  await fb.deleteDoc(fb.doc(fb.db,'usuarios',user.uid));
+  await fb.deleteUser(user);try{localStorage.removeItem(SILOMAIZ_REG_KEY);}catch(e){}
+  document.getElementById('smAccountPanel').classList.remove('activo');alert('Tu cuenta y los datos de tu perfil fueron eliminados.');
+ }catch(ex){
+  const c=(ex&&ex.code)||'';msg.style.color='#b42318';
+  msg.textContent=(c.includes('invalid-credential')||c.includes('wrong-password'))?'La contraseña no es correcta. No se eliminó la cuenta.':c.includes('network-request-failed')?'No hay conexión con Internet. Intenta nuevamente.':'No fue posible eliminar la cuenta. Cierra sesión, vuelve a ingresar y prueba nuevamente.';
+ }
+}
+function silomaizInitCuenta(){
+ const b=document.getElementById('smAccountBtn'),p=document.getElementById('smAccountPanel');
+ b?.addEventListener('click',()=>p.classList.add('activo'));
+ document.getElementById('smCloseAccount')?.addEventListener('click',()=>p.classList.remove('activo'));
+ document.getElementById('smLogout')?.addEventListener('click',silomaizCerrarSesion);
+ document.getElementById('smDeleteAccount')?.addEventListener('click',silomaizEliminarCuenta);
+ p?.addEventListener('click',e=>{if(e.target===p)p.classList.remove('activo');});
+}
+
 window.addEventListener('DOMContentLoaded',silomaizInitRegistro);
+window.addEventListener('DOMContentLoaded',silomaizInitCuenta);
 
 // Event delegation - ONLY for data-fn elements (onclick="" already fires natively, no patch needed)
 document.addEventListener('click', function(e){
